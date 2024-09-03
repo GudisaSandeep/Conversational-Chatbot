@@ -36,14 +36,20 @@ def text_chat(text):
 
 def image_analysis(image, prompt):
     if isinstance(image, np.ndarray):
-        # Convert numpy array to bytes
+        # Convert numpy array to PIL Image
         pil_image = Image.fromarray(image)
-        img_byte_arr = io.BytesIO()
-        pil_image.save(img_byte_arr, format='JPEG')
-        bytes_data = img_byte_arr.getvalue()
+    elif isinstance(image, Image.Image):
+        # Image is already a PIL Image
+        pil_image = image
     else:
         # Assume image is already in bytes format
         bytes_data = image
+
+    # Convert PIL Image to bytes if necessary
+    if 'pil_image' in locals():
+        img_byte_arr = io.BytesIO()
+        pil_image.save(img_byte_arr, format='JPEG')
+        bytes_data = img_byte_arr.getvalue()
 
     model = genai.GenerativeModel(model_name="gemini-1.5-flash")
     response = model.generate_content(
@@ -57,6 +63,8 @@ def image_analysis(image, prompt):
     )
     response.resolve()
     return response.text
+
+
 
 class VoiceInteraction:
     def __init__(self):
