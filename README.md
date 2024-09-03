@@ -22,8 +22,8 @@ Ensure you have the following installed:
 1. **Clone the Repository**
 
    ```bash
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/GudisaSandeep/Conversational-Chatbot/tree/main
+   cd Conversational-Chatbot
    ```
 
 2. **Install Dependencies**
@@ -55,7 +55,7 @@ Ensure you have the following installed:
 Run the application using:
 
 ```bash
-python app.py
+gradio main.py
 ```
 
 Open your browser and navigate to `http://localhost:7860` to interact with the Gradio interface.
@@ -97,4 +97,3 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-Make sure to replace placeholders like `<repository-url>` and `<repository-directory>` with actual values relevant to your project.
