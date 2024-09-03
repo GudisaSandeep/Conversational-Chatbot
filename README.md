@@ -57,7 +57,7 @@ Make sure you have the following installed:
    Run the following command to start the Gradio app:
 
    ```bash
-   python main.py
+   python main2.py
    ```
 
 2. **Access the Application**
@@ -87,7 +87,7 @@ Make sure you have the following installed:
 - **Start Application:**
 
   ```bash
-  python main.py
+  python main2.py
   ```
 
 - **Stop Application:**
