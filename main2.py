@@ -127,7 +127,9 @@ def update_conversation():
     return voice_interaction.conversation
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# 🤖 AI Assistant powered by Google Gemini")
+    gr.Markdown("# 🤖 Interactive AI Assistance")
+    gr.Markdown("# Developed by Sandeep Gudisa")
+    
     
     with gr.Tab("💬 Text Chat"):
         with gr.Row():
