@@ -127,7 +127,8 @@ def update_conversation():
     return voice_interaction.conversation
 
 with gr.Blocks() as demo:
-    gr.Markdown("# Google AI Studio + Gemini Pro")
+    gr.Markdown("# Interactive AI Assistant")
+    gr.Markdown("Developed by Sandeep Gudisa")
     with gr.Tab("Text Chat"):
         text_input = gr.Textbox(label="Enter your prompt here..")
         text_button = gr.Button("Generate!")
@@ -152,5 +153,5 @@ with gr.Blocks() as demo:
         
         gr.Markdown("The conversation will update automatically every 5 seconds.")
         demo.load(update_conversation, inputs=[], outputs=[conversation_output], every=5)
-        gr.Markdown("Developed by Sandeep Gudisa")
+        
 demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)), share=True)
