@@ -152,4 +152,4 @@ with gr.Blocks() as demo:
         
         gr.Markdown("The conversation will update automatically every 5 seconds.")
         demo.load(update_conversation, inputs=[], outputs=[conversation_output], every=5)
-demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)), share=False)
+demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)), share=True)
