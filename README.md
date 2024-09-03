@@ -1,9 +1,4 @@
-Sure! Here's a detailed README for your Gradio-based application that includes commands for setup and usage:
-
----
-
-# Google AI Studio + Gemini Pro
-
+#Conversational-Chatbot
 ## Overview
 
 This project integrates Google AI services into a Gradio application, featuring:
