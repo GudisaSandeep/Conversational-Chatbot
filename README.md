@@ -24,8 +24,8 @@ Make sure you have the following installed:
 1. **Clone the Repository**
 
    ```bash
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/GudisaSandeep/Conversational-Chatbot/tree/main
+   cd Conversational-Chatbot
    ```
 
 2. **Create and Activate a Virtual Environment**
