@@ -126,32 +126,42 @@ def stop_voice_interaction():
 def update_conversation():
     return voice_interaction.conversation
 
-with gr.Blocks() as demo:
-    gr.Markdown("# Interactive AI Assistant")
-    gr.Markdown("Developed by Sandeep Gudisa")
-    with gr.Tab("Text Chat"):
-        text_input = gr.Textbox(label="Enter your prompt here..")
-        text_button = gr.Button("Generate!")
-        text_output = gr.Chatbot()
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🤖 AI Assistant powered by Google Gemini")
+    
+    with gr.Tab("💬 Text Chat"):
+        with gr.Row():
+            with gr.Column(scale=4):
+                text_input = gr.Textbox(label="Your message", placeholder="Type your message here...")
+            with gr.Column(scale=1):
+                text_button = gr.Button("Send", variant="primary")
+        text_output = gr.Chatbot(height=400)
         text_button.click(text_chat, inputs=text_input, outputs=text_output)
 
-    with gr.Tab("Image Analysis"):
-        image_input = gr.Image(label="Choose an Image file")
-        image_prompt = gr.Textbox(label="Enter your prompt here..")
-        image_button = gr.Button("Analyze Image")
-        image_output = gr.Textbox(label="Image Analysis")
+    with gr.Tab("🖼️ Image Analysis"):
+        with gr.Row():
+            with gr.Column(scale=1):
+                image_input = gr.Image(label="Upload Image", type="pil")
+            with gr.Column(scale=1):
+                image_prompt = gr.Textbox(label="Prompt", placeholder="Ask about the image...")
+                image_button = gr.Button("Analyze", variant="primary")
+        image_output = gr.Markdown(label="Analysis Result")
         image_button.click(image_analysis, inputs=[image_input, image_prompt], outputs=image_output)
 
-    with gr.Tab("Voice Interaction"):
-        start_button = gr.Button("Start Voice Interaction")
-        stop_button = gr.Button("Stop Voice Interaction")
-        status_output = gr.Textbox(label="Status")
-        conversation_output = gr.Chatbot(label="Conversation")
+    with gr.Tab("🎙️ Voice Interaction"):
+        with gr.Row():
+            start_button = gr.Button("Start Voice Interaction", variant="primary")
+            stop_button = gr.Button("Stop Voice Interaction", variant="secondary")
+        status_output = gr.Markdown(label="Status")
+        conversation_output = gr.Chatbot(label="Conversation", height=400)
         
         start_button.click(start_voice_interaction, inputs=[], outputs=[status_output, conversation_output])
         stop_button.click(stop_voice_interaction, inputs=[], outputs=[status_output, conversation_output])
         
         gr.Markdown("The conversation will update automatically every 5 seconds.")
         demo.load(update_conversation, inputs=[], outputs=[conversation_output], every=5)
-        
-demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)), share=True)
+
+demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)), share=False)
+
+
+
