@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv
+import json
+import gradio as gr
 import google.generativeai as genai
 import google.ai.generativelanguage as glm
 from PIL import Image
-import gradio as gr
-import numpy as np
 import io
 import speech_recognition as sr
 import edge_tts
@@ -12,7 +12,6 @@ import asyncio
 import pygame
 import threading
 
-# Load environment variables from .env file
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 
@@ -64,7 +63,6 @@ def image_analysis(image, prompt):
     response.resolve()
     return response.text
 
-
 class VoiceInteraction:
     def __init__(self):
         self.is_running = False
@@ -76,66 +74,44 @@ class VoiceInteraction:
         communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
         audio_path = "output.mp3"
         await communicate.save(audio_path)
-        
-        pygame.mixer.init()
-        pygame.mixer.music.load(audio_path)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
-        pygame.mixer.quit()
 
-    def listen_and_respond(self):
-        with sr.Microphone() as source:
-            while self.is_running:
-                try:
-                    #print("Listening...")
-                    audio = self.recognizer.listen(source, timeout=5)
-                    text = self.recognizer.recognize_google(audio)
-                    #print("You said:", text)
-                    self.conversation.append(("You", text))
+        audio = AudioSegment.from_file(audio_path, format="mp3")
+        audio = audio.set_frame_rate(16000)
+        audio = audio.set_channels(1)
 
-                    response = self.model.generate_content(
-                        glm.Content(parts=[glm.Part(text=text)]),
-                        stream=True
-                    )
-                    response.resolve()
-
-                    #print("Assistant:", response.text)
-                    self.conversation.append(("Assistant", response.text))
-                    asyncio.run(self.text_to_speech_and_play(response.text))
-                except sr.WaitTimeoutError:
-                    continue
-                except sr.UnknownValueError:
-                    print("Could not understand audio")
-                except sr.RequestError as e:
-                    print(f"Error: {str(e)}")
+        display(ipd.Audio(audio.raw_data, autoplay=True))
+        os.remove(audio_path)
 
     def start(self):
-        self.is_running = True
-        self.thread = threading.Thread(target=self.listen_and_respond)
-        self.thread.start()
+        pass
 
     def stop(self):
-        self.is_running = False
-        if hasattr(self, 'thread'):
-            self.thread.join()
+        pass
 
 voice_interaction = VoiceInteraction()
 
+@app.route('/api/voice_interaction', methods=['POST'])
+def voice_interaction():
+    text = request.json['content']
+    response = model.generate_content(
+        glm.Content(parts=[glm.Part(text=text)]),
+        stream=True
+    )
+    response.resolve()
+    return jsonify({'content': response.text})
+
 def start_voice_interaction():
-    voice_interaction.start()
-    return "Voice interaction started. Speak now!", voice_interaction.conversation
+    return None, None
 
 def stop_voice_interaction():
-    voice_interaction.stop()
-    return "Voice interaction stopped.", voice_interaction.conversation
+    return None, None
 
 def update_conversation():
     return voice_interaction.conversation
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🤖 AI Assistant powered by Google Gemini")
-    
+
     with gr.Tab("💬 Text Chat"):
         with gr.Row():
             with gr.Column(scale=4):
@@ -167,6 +143,5 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         
         gr.Markdown("The conversation will update automatically every 5 seconds.")
         demo.load(update_conversation, inputs=[], outputs=[conversation_output], every=5)
-
 
 demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)), share=False)
