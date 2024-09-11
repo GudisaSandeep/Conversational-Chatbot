@@ -3,7 +3,7 @@ google-generativeai
 google-ai-generativelanguage
 Pillow
 numpy
-speechrecognition
+SpeechRecognition
 edge-tts
 pygame
 python-dotenv
