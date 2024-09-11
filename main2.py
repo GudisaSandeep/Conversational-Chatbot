@@ -75,41 +75,34 @@ class VoiceInteraction:
 
     async def text_to_speech_and_play(self, text):
         communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
-        audio_path = "output.mp3"
+        audio_path = "/tmp/output.mp3"
         await communicate.save(audio_path)
         
-        pygame.mixer.init()
-        pygame.mixer.music.load(audio_path)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
-        pygame.mixer.quit()
+        # Instead of playing audio, just log that it would be played
+        print(f"Audio would be played: {audio_path}")
 
     def listen_and_respond(self):
-        with sr.Microphone() as source:
-            while self.is_running:
-                try:
-                    #print("Listening...")
-                    audio = self.recognizer.listen(source, timeout=5)
-                    text = self.recognizer.recognize_google(audio)
-                    #print("You said:", text)
-                    self.conversation.append(("You", text))
+        while self.is_running:
+            try:
+                # Simulate listening by waiting for a short time
+                asyncio.run(asyncio.sleep(5))
+                
+                # Simulate received text
+                text = "Simulated user input"
+                print("Simulated user said:", text)
+                self.conversation.append(("You", text))
 
-                    response = self.model.generate_content(
-                        glm.Content(parts=[glm.Part(text=text)]),
-                        stream=True
-                    )
-                    response.resolve()
+                response = self.model.generate_content(
+                    glm.Content(parts=[glm.Part(text=text)]),
+                    stream=True
+                )
+                response.resolve()
 
-                    #print("Assistant:", response.text)
-                    self.conversation.append(("Assistant", response.text))
-                    asyncio.run(self.text_to_speech_and_play(response.text))
-                except sr.WaitTimeoutError:
-                    continue
-                except sr.UnknownValueError:
-                    print("Could not understand audio")
-                except sr.RequestError as e:
-                    print(f"Error: {str(e)}")
+                print("Assistant:", response.text)
+                self.conversation.append(("Assistant", response.text))
+                asyncio.run(self.text_to_speech_and_play(response.text))
+            except Exception as e:
+                print(f"Error in voice interaction: {str(e)}")
 
     def start(self):
         self.is_running = True
