@@ -7,4 +7,4 @@ SpeechRecognition
 edge-tts
 pygame
 python-dotenv
-PyAudio
+
