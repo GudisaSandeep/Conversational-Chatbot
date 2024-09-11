@@ -8,6 +8,8 @@ import numpy as np
 import io
 import edge_tts
 import asyncio
+import tempfile
+import speech_recognition as sr
 
 # Load environment variables from .env file
 load_dotenv()
@@ -57,31 +59,48 @@ def image_analysis(image, prompt):
     response.resolve()
     return response.text
 
-async def text_to_speech(text):
-    communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
-    audio_path = "output.mp3"
-    await communicate.save(audio_path)
-    return audio_path
+class VoiceInteraction:
+    def __init__(self):
+        self.model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        self.conversation = []
+        self.recognizer = sr.Recognizer()
 
-def voice_interaction(audio):
-    if audio is None:
-        return "No audio detected. Please try again.", None
+    async def text_to_speech(self, text):
+        communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
+            await communicate.save(temp_file.name)
+            return temp_file.name
 
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-    response = model.generate_content(
-        glm.Content(
-            parts=[
-                glm.Part(text=audio),
-            ],
-        ),
-        stream=True
-    )
-    response.resolve()
-    
-    # Generate speech asynchronously
-    audio_path = asyncio.run(text_to_speech(response.text))
-    
-    return response.text, audio_path
+    def transcribe_audio(self, audio_file):
+        with sr.AudioFile(audio_file) as source:
+            audio = self.recognizer.record(source)
+        try:
+            return self.recognizer.recognize_google(audio)
+        except sr.UnknownValueError:
+            return "Speech recognition could not understand the audio"
+        except sr.RequestError as e:
+            return f"Could not request results from speech recognition service; {e}"
+
+    async def process_voice_input(self, audio):
+        if audio is None:
+            return "No audio detected. Please try again.", None, self.conversation
+
+        user_text = self.transcribe_audio(audio)
+        self.conversation.append(("You", user_text))
+
+        response = self.model.generate_content(
+            glm.Content(parts=[glm.Part(text=user_text)]),
+            stream=True
+        )
+        response.resolve()
+
+        self.conversation.append(("Assistant", response.text))
+        
+        audio_path = await self.text_to_speech(response.text)
+        
+        return response.text, audio_path, self.conversation
+
+voice_interaction = VoiceInteraction()
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🤖 Interactive AI Assistance")
@@ -110,7 +129,12 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         audio_input = gr.Audio(source="microphone", type="filepath")
         text_output = gr.Textbox(label="AI Response")
         audio_output = gr.Audio(label="AI Voice Response")
+        conversation_output = gr.Chatbot(label="Conversation", height=400)
         
-        audio_input.change(voice_interaction, inputs=[audio_input], outputs=[text_output, audio_output])
+        audio_input.change(
+            lambda x: asyncio.run(voice_interaction.process_voice_input(x)), 
+            inputs=[audio_input], 
+            outputs=[text_output, audio_output, conversation_output]
+        )
 
 demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)), share=False)
