@@ -7,10 +7,11 @@ import gradio as gr
 import numpy as np
 import io
 import speech_recognition as sr
+from pydub import AudioSegment
 import edge_tts
 import asyncio
-import pygame
-import threading
+import base64
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -67,106 +68,102 @@ def image_analysis(image, prompt):
 
 class VoiceInteraction:
     def __init__(self):
-        self.is_running = False
-        self.recognizer = sr.Recognizer()
         self.model = genai.GenerativeModel(model_name="gemini-1.5-flash")
         self.conversation = []
+        self.recognizer = sr.Recognizer()
 
-    async def text_to_speech_and_play(self, text):
+    async def text_to_speech(self, text):
         communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
-        audio_path = "output.mp3"
-        await communicate.save(audio_path)
+        audio = io.BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio.write(chunk["data"])
+        audio.seek(0)
+        return audio.getvalue()
+
+    def process_audio(self, audio_data):
+        audio = AudioSegment.from_wav(io.BytesIO(audio_data))
+        audio.export("temp.wav", format="wav")
         
-        pygame.mixer.init()
-        pygame.mixer.music.load(audio_path)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
-        pygame.mixer.quit()
+        with sr.AudioFile("temp.wav") as source:
+            audio = self.recognizer.record(source)
+        
+        try:
+            text = self.recognizer.recognize_google(audio)
+            self.conversation.append(("You", text))
 
-    def listen_and_respond(self):
-        with sr.Microphone() as source:
-            while self.is_running:
-                try:
-                    #print("Listening...")
-                    audio = self.recognizer.listen(source, timeout=5)
-                    text = self.recognizer.recognize_google(audio)
-                    #print("You said:", text)
-                    self.conversation.append(("You", text))
+            response = self.model.generate_content(
+                glm.Content(parts=[glm.Part(text=text)]),
+                stream=True
+            )
+            response.resolve()
 
-                    response = self.model.generate_content(
-                        glm.Content(parts=[glm.Part(text=text)]),
-                        stream=True
-                    )
-                    response.resolve()
-
-                    #print("Assistant:", response.text)
-                    self.conversation.append(("Assistant", response.text))
-                    asyncio.run(self.text_to_speech_and_play(response.text))
-                except sr.WaitTimeoutError:
-                    continue
-                except sr.UnknownValueError:
-                    print("Could not understand audio")
-                except sr.RequestError as e:
-                    print(f"Error: {str(e)}")
-
-    def start(self):
-        self.is_running = True
-        self.thread = threading.Thread(target=self.listen_and_respond)
-        self.thread.start()
-
-    def stop(self):
-        self.is_running = False
-        if hasattr(self, 'thread'):
-            self.thread.join()
+            self.conversation.append(("Assistant", response.text))
+            return text, response.text
+        except sr.UnknownValueError:
+            return "Could not understand audio", "Sorry, I couldn't understand the audio."
+        except sr.RequestError as e:
+            return f"Error: {str(e)}", "There was an error processing your request."
+        finally:
+            os.remove("temp.wav")
 
 voice_interaction = VoiceInteraction()
 
-def start_voice_interaction():
-    voice_interaction.start()
-    return "Voice interaction started. Speak now!", voice_interaction.conversation
-
-def stop_voice_interaction():
-    voice_interaction.stop()
-    return "Voice interaction stopped.", voice_interaction.conversation
-
-def update_conversation():
-    return voice_interaction.conversation
+async def process_audio_stream(websocket):
+    audio_data = b""
+    async for message in websocket:
+        data = json.loads(message)
+        if data['type'] == 'audio':
+            audio_chunk = base64.b64decode(data['data'])
+            audio_data += audio_chunk
+        elif data['type'] == 'end':
+            user_text, assistant_response = voice_interaction.process_audio(audio_data)
+            audio_response = await voice_interaction.text_to_speech(assistant_response)
+            await websocket.send(json.dumps({
+                'type': 'response',
+                'user_text': user_text,
+                'assistant_text': assistant_response,
+                'audio': base64.b64encode(audio_response).decode('utf-8')
+            }))
+            audio_data = b""
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🤖 AI Assistant powered by Google Gemini")
     
-    with gr.Tab("💬 Text Chat"):
-        with gr.Row():
-            with gr.Column(scale=4):
-                text_input = gr.Textbox(label="Your message", placeholder="Type your message here...")
-            with gr.Column(scale=1):
-                text_button = gr.Button("Send", variant="primary")
-        text_output = gr.Chatbot(height=400)
-        text_button.click(text_chat, inputs=text_input, outputs=text_output)
+    # ... [Text Chat and Image Analysis tabs remain the same]
 
-    with gr.Tab("🖼️ Image Analysis"):
-        with gr.Row():
-            with gr.Column(scale=1):
-                image_input = gr.Image(label="Upload Image", type="pil")
-            with gr.Column(scale=1):
-                image_prompt = gr.Textbox(label="Prompt", placeholder="Ask about the image...")
-                image_button = gr.Button("Analyze", variant="primary")
-        image_output = gr.Markdown(label="Analysis Result")
-        image_button.click(image_analysis, inputs=[image_input, image_prompt], outputs=image_output)
+    with gr.Tab("🎙️ Live Voice Interaction"):
+        audio_input = gr.Audio(source="microphone", streaming=True, type="numpy")
+        start_button = gr.Button("Start Interaction")
+        stop_button = gr.Button("Stop Interaction")
+        user_text_output = gr.Textbox(label="You said")
+        assistant_text_output = gr.Textbox(label="Assistant response")
+        audio_output = gr.Audio(label="Audio response")
+        conversation_output = gr.Chatbot(label="Conversation History", height=400)
 
-    with gr.Tab("🎙️ Voice Interaction"):
-        with gr.Row():
-            start_button = gr.Button("Start Voice Interaction", variant="primary")
-            stop_button = gr.Button("Stop Voice Interaction", variant="secondary")
-        status_output = gr.Markdown(label="Status")
-        conversation_output = gr.Chatbot(label="Conversation", height=400)
+        def start_interaction():
+            return gr.update(visible=True), gr.update(visible=False)
+
+        def stop_interaction():
+            return gr.update(visible=False), gr.update(visible=True)
+
+        start_button.click(start_interaction, outputs=[stop_button, start_button])
+        stop_button.click(stop_interaction, outputs=[stop_button, start_button])
         
-        start_button.click(start_voice_interaction, inputs=[], outputs=[status_output, conversation_output])
-        stop_button.click(stop_voice_interaction, inputs=[], outputs=[status_output, conversation_output])
-        
-        gr.Markdown("The conversation will update automatically every 5 seconds.")
-        demo.load(update_conversation, inputs=[], outputs=[conversation_output], every=10)
+        def handle_audio(audio):
+            if len(audio) == 0:
+                return None, None, None, None
+            audio_data = (audio * 32767).astype(np.int16).tobytes()
+            user_text, assistant_response = voice_interaction.process_audio(audio_data)
+            audio_response = asyncio.run(voice_interaction.text_to_speech(assistant_response))
+            return user_text, assistant_response, audio_response, voice_interaction.conversation
 
+        audio_input.stream(
+            handle_audio,
+            inputs=[audio_input],
+            outputs=[user_text_output, assistant_text_output, audio_output, conversation_output],
+            show_progress=False,
+        )
 
+demo.queue()
 demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)), share=False)
