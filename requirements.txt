@@ -10,3 +10,4 @@ python-dotenv
 pyaudio==0.2.13
 pydub
 opencv-python
+deep-translator
