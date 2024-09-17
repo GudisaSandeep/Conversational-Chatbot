@@ -300,4 +300,4 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
 
         sensitivity_slider.change(update_sensitivity, inputs=[sensitivity_slider], outputs=[status_output])
         gr.Markdown("## Developed by AI INTENTS ")
-demo.launch(share=False)
+demo.launch(share=True)
